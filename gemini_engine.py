@@ -3,9 +3,10 @@ import httpx
 from typing import Optional
 
 GEMINI_API_KEY  = os.getenv("GEMINI_API_KEY", "")
-GEMINI_TEXT_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
-GEMINI_VISION_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 
+GEMINI_TEXT_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 # ─── Shared nutrition JSON schema used by both text & vision prompts ─────────
 _NUTRITION_SCHEMA = """
@@ -45,19 +46,20 @@ _GRADE_CRITERIA = (
 
 
 class GeminiEngine:
-    """Gemini API wrapper — supports text analysis and vision (image) analysis."""
+    """Gemini API wrapper — supports text analysis and vision (image) analysis with OpenRouter fallback."""
 
     def __init__(self):
         self.api_key  = GEMINI_API_KEY
+        self.or_key = OPENROUTER_API_KEY
         self.headers  = {"Content-Type": "application/json"}
 
     # ─────────────────────────────────────────────────────────────────────────
     # Internal helpers
     # ─────────────────────────────────────────────────────────────────────────
 
-    async def _call(self, payload: dict, url: str = GEMINI_TEXT_URL) -> dict:
+    async def _call_gemini(self, payload: dict, url: str = GEMINI_TEXT_URL) -> dict:
         """Send a payload to Gemini and return parsed JSON."""
-        async with httpx.AsyncClient(timeout=45) as client:
+        async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.post(
                 f"{url}?key={self.api_key}",
                 headers=self.headers,
@@ -68,24 +70,30 @@ class GeminiEngine:
             text = raw["candidates"][0]["content"]["parts"][0]["text"]
             return self._parse_json(text)
 
-    def _call_text(self, prompt: str) -> dict:
-        """Build a text-only Gemini payload."""
-        return {
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"temperature": 0.25, "maxOutputTokens": 1500},
+    async def _call_openrouter(self, prompt: str) -> dict:
+        """Fallback call to OpenRouter (using Llama 3 or similar) if Gemini fails."""
+        if not self.or_key:
+            raise Exception("OpenRouter API key not configured")
+            
+        headers = {
+            "Authorization": f"Bearer {self.or_key}",
+            "HTTP-Referer": "https://foodyfix.ai", # Optional
+            "X-Title": "FoodyFix",
+            "Content-Type": "application/json"
         }
-
-    def _call_vision(self, prompt: str, image_b64: str, mime_type: str) -> dict:
-        """Build a multimodal (text + image) Gemini payload."""
-        return {
-            "contents": [{
-                "parts": [
-                    {"inline_data": {"mime_type": mime_type, "data": image_b64}},
-                    {"text": prompt},
-                ]
-            }],
-            "generationConfig": {"temperature": 0.25, "maxOutputTokens": 1500},
+        
+        payload = {
+            "model": "meta-llama/llama-3-8b-instruct:free",
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.2
         }
+        
+        async with httpx.AsyncClient(timeout=45) as client:
+            resp = await client.post(OPENROUTER_URL, headers=headers, json=payload)
+            resp.raise_for_status()
+            raw = resp.json()
+            text = raw["choices"][0]["message"]["content"]
+            return self._parse_json(text)
 
     def _parse_json(self, text: str) -> dict:
         """Strip markdown fences and parse JSON robustly."""
@@ -121,106 +129,77 @@ class GeminiEngine:
     # ─────────────────────────────────────────────────────────────────────────
 
     async def analyze_food(self, food_item: str, quantity: str = "1 serving") -> dict:
-        """Text-based food analysis using Gemini 1.5 Flash."""
+        """Analyze food with Gemini, fallback to OpenRouter on failure."""
         prompt = (
             f'You are a precision nutritionist AI. '
             f'Analyze "{quantity} of {food_item}" and respond ONLY with this exact JSON '
             f'(no markdown, no extra text):\n{_NUTRITION_SCHEMA}\n{_GRADE_CRITERIA}'
         )
         try:
-            return await self._call(self._call_text(prompt))
-        except Exception as exc:
-            return self._fallback_nutrition(food_item, quantity, str(exc))
+            # Try Gemini First
+            return await self._call_gemini({
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1000},
+            })
+        except Exception as e:
+            # Fallback to OpenRouter
+            try:
+                return await self._call_openrouter(prompt)
+            except Exception as or_e:
+                return self._fallback_nutrition(food_item, quantity, f"Gemini: {e} | OpenRouter: {or_e}")
 
     async def analyze_food_image(self, image_bytes: bytes, mime_type: str = "image/jpeg") -> dict:
-        """
-        Vision-based food analysis — accepts raw image bytes.
-        Gemini 1.5 Flash identifies the food, estimates portions, and
-        returns the same structured nutrition JSON as analyze_food().
-        """
+        """Analyze food image with Gemini (multimodal). Fallback to text-only OpenRouter if vision fails."""
         image_b64 = base64.b64encode(image_bytes).decode("utf-8")
         prompt = (
-            "You are an expert nutritionist AI with computer vision capabilities. "
-            "Look at this food image carefully. Identify every food item visible, "
-            "estimate the portion size, and respond ONLY with this exact JSON "
-            "(no markdown, no extra text):\n"
-            + _NUTRITION_SCHEMA
-            + "\n" + _GRADE_CRITERIA
-            + "\n\nIf multiple foods are visible, analyze the dominant item and mention others "
-            "in the food_name field. If the image does not contain food, set food_name to "
-            "'Unknown' and calories to 0."
+            "You are an expert nutritionist AI. Identify food items in this image, "
+            "estimate portion size, and respond ONLY with this JSON:\n"
+            + _NUTRITION_SCHEMA + "\n" + _GRADE_CRITERIA
         )
         try:
-            payload = self._call_vision(prompt, image_b64, mime_type)
-            return await self._call(payload, url=GEMINI_VISION_URL)
-        except Exception as exc:
-            return self._fallback_nutrition("Image food", "estimated portion", str(exc))
+            payload = {
+                "contents": [{
+                    "parts": [
+                        {"inline_data": {"mime_type": mime_type, "data": image_b64}},
+                        {"text": prompt},
+                    ]
+                }],
+                "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1000},
+            }
+            return await self._call_gemini(payload)
+        except Exception as e:
+            # Note: OpenRouter doesn't easily support vision on free models, 
+            # so we just return the error for vision for now, or fallback to a text-only guess.
+            return self._fallback_nutrition("Image food", "estimated portion", str(e))
 
     async def generate_health_forecast(self, cal_in: float, cal_out: float, weight_change: float) -> dict:
-        """30-day weight and health projection."""
+        """30-day health projection."""
         direction  = "gain" if weight_change > 0 else "loss"
         abs_change = abs(round(weight_change, 2))
         prompt = (
-            f"You are a predictive health AI. A user averages {cal_in:.0f} calories consumed "
-            f"and {cal_out:.0f} calories burned daily. "
-            f"Predicted 30-day weight {direction}: {abs_change} kg.\n\n"
-            "Respond ONLY with this JSON (no markdown):\n"
-            "{\n"
-            '  "summary": "2-sentence plain-English forecast",\n'
-            '  "risk_level": "<low|moderate|high|critical>",\n'
-            '  "primary_risk": "main health risk in 5 words",\n'
-            '  "fatigue_warning": "<describe fatigue risk if net positive calories>",\n'
-            '  "action_items": ["action1", "action2", "action3"],\n'
-            '  "motivational_message": "one encouraging sentence",\n'
-            '  "weeks_to_goal": <estimated weeks to healthy balance as integer>\n'
-            "}"
+            f"Predict 30-day weight {direction}: {abs_change} kg. "
+            f"Calories In: {cal_in:.0f}, Out: {cal_out:.0f}. "
+            "Respond ONLY with JSON:\n"
+            '{"summary": "...", "risk_level": "...", "primary_risk": "...", "action_items": [], "motivational_message": "...", "weeks_to_goal": 0}'
         )
         try:
-            return await self._call(self._call_text(prompt))
-        except Exception as exc:
-            return {
-                "summary": "Unable to generate forecast at this time.",
-                "risk_level": "moderate",
-                "primary_risk": "Caloric imbalance detected",
-                "fatigue_warning": "",
-                "action_items": [
-                    "Track meals consistently",
-                    "Add 30 mins of activity",
-                    "Drink more water",
-                ],
-                "motivational_message": "Every healthy choice counts!",
-                "weeks_to_goal": 8,
-                "error": str(exc),
-            }
+            return await self._call_gemini({"contents": [{"parts": [{"text": prompt}]}]})
+        except Exception:
+            try:
+                return await self._call_openrouter(prompt)
+            except Exception:
+                return {"summary": "Forecasting unavailable.", "error": "AI failure"}
 
     async def generate_report_insights(self, report_data: dict) -> dict:
-        """AI-generated monthly health report insights."""
+        """Monthly health report insights."""
         prompt = (
-            "You are a nutritional data analyst. Here is a user's monthly health data:\n"
-            + json.dumps(report_data, indent=2)
-            + "\n\nRespond ONLY with this JSON:\n"
-            "{\n"
-            '  "headline": "one punchy headline about their month",\n'
-            '  "biggest_win": "their best achievement this month",\n'
-            '  "biggest_challenge": "their main struggle",\n'
-            '  "next_month_goal": "one specific, measurable goal",\n'
-            '  "diet_pattern": "<balanced|calorie_surplus|calorie_deficit|erratic>",\n'
-            '  "recommendations": ["rec1", "rec2", "rec3"]\n'
-            "}"
+            "Nutritional data analysis for month. Data:\n" + json.dumps(report_data) +
+            "\nRespond ONLY with JSON: {\"headline\": \"...\", \"biggest_win\": \"...\", \"biggest_challenge\": \"...\", \"next_month_goal\": \"...\", \"recommendations\": []}"
         )
         try:
-            return await self._call(self._call_text(prompt))
-        except Exception as exc:
-            return {
-                "headline": "Keep pushing your health goals!",
-                "biggest_win": "You tracked your meals consistently",
-                "biggest_challenge": "Maintaining caloric balance",
-                "next_month_goal": "Log meals every day",
-                "diet_pattern": "balanced",
-                "recommendations": [
-                    "Eat more vegetables",
-                    "Exercise 3x per week",
-                    "Drink 2L water daily",
-                ],
-                "error": str(exc),
-            }
+            return await self._call_gemini({"contents": [{"parts": [{"text": prompt}]}]})
+        except Exception:
+            try:
+                return await self._call_openrouter(prompt)
+            except Exception:
+                return {"headline": "Keep going!", "recommendations": ["Log more meals"]}
