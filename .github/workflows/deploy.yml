@@ -5,7 +5,7 @@ on:
     branches: [ "main", "master" ]
 
 env:
-  PROJECT_ID: foodyfix-495510
+  PROJECT_ID: foodyfix-eef1f
   REGION: us-central1
   SERVICE_NAME: foodyfix-portal
 

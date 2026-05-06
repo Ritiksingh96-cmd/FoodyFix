@@ -11,4 +11,5 @@ ENV/
 *.log
 static/images/hero_*
 static/images/auth_*
+*.json
 # We'll include the current ones but exclude future generated junk

@@ -1,5 +1,5 @@
 # Configuration
-$PROJECT_ID = "foodyfix-495510"
+$PROJECT_ID = "foodyfix-eef1f"
 $SERVICE_NAME = "foodyfix-portal"
 $REGION = "us-central1"
 $IMAGE_URL = "gcr.io/$PROJECT_ID/$SERVICE_NAME:latest"

@@ -6,7 +6,7 @@ class DBManager:
     def __init__(self):
         # Initialize Firestore client
         # In production, it uses GOOGLE_APPLICATION_CREDENTIALS or the default project identity
-        project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "foodyfix-portal")
+        project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "foodyfix-eef1f")
         self.db = firestore.Client(project=project_id)
         self.users_ref = self.db.collection("users")
 
