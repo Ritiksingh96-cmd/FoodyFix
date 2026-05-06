@@ -316,6 +316,7 @@ async def analyze_food(query: FoodQuery):
 
 # ─── API: Log Meal ────────────────────────────────────────────────────────────
 @app.post("/api/meals")
+async def log_meal(meal: MealLog):
     analysis = await gemini.analyze_food(meal.name, meal.quantity)
     entry = {
         "name": meal.name,
@@ -338,6 +339,7 @@ async def analyze_food(query: FoodQuery):
     return JSONResponse(content={"success": True, "meal": entry})
 
 @app.post("/api/scan")
+async def scan_food_image(file: UploadFile = File(...)):
     try:
         contents = await file.read()
         analysis = await gemini.analyze_food_image(contents, file.content_type)
