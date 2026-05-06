@@ -8,6 +8,7 @@ from typing import Optional, List, Dict, Any
 import os, json, logging, asyncio
 from datetime import datetime, timedelta, date
 from gemini_engine import GeminiEngine
+from db_manager import db_manager
 
 # Firebase and Google Cloud imports
 try:
@@ -84,23 +85,8 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 gemini = GeminiEngine()
 
-# ─── Enhanced In-memory store with better structure ───────────────────────
-USER_DATA = {
-    "meals": [],          # {id, name, calories, fat, protein, date, grade, credits_earned}
-    "calories_burned": [], # {date, amount, activity}
-    "credits": 0,
-    "orders": [],         # {id, source, items, total_cal, date, status}
-    "user_profile": {
-        "name": "Health Explorer",
-        "email": "user@foodyfix.com",
-        "join_date": datetime.now().isoformat(),
-        "goals": {
-            "daily_calories": 2000,
-            "target_weight": None,
-            "activity_level": "moderate"
-        }
-    }
-}
+# Firestore is now used via db_manager
+# USER_DATA is kept as a local cache or removed where possible
 
 # ─── Pydantic Models ──────────────────────────────────────────────────────────
 class FoodQuery(BaseModel):
@@ -330,10 +316,8 @@ async def analyze_food(query: FoodQuery):
 
 # ─── API: Log Meal ────────────────────────────────────────────────────────────
 @app.post("/api/meals")
-async def log_meal(meal: MealLog):
     analysis = await gemini.analyze_food(meal.name, meal.quantity)
     entry = {
-        "id": len(USER_DATA["meals"]) + 1,
         "name": meal.name,
         "quantity": meal.quantity,
         "calories": analysis.get("calories", 0),
@@ -345,22 +329,20 @@ async def log_meal(meal: MealLog):
         "timestamp": datetime.now().isoformat(),
         "analysis": analysis
     }
-    USER_DATA["meals"].append(entry)
     # Award credits
     credits_earned = _calculate_credits(entry)
-    USER_DATA["credits"] += credits_earned
     entry["credits_earned"] = credits_earned
-    return JSONResponse(content={"success": True, "meal": entry, "total_credits": USER_DATA["credits"]})
+    
+    db_manager.add_meal(entry)
+    
+    return JSONResponse(content={"success": True, "meal": entry})
 
 @app.post("/api/scan")
-async def scan_food_image(file: UploadFile = File(...)):
     try:
         contents = await file.read()
         analysis = await gemini.analyze_food_image(contents, file.content_type)
         
-        # Auto-log as a meal for the user
         entry = {
-            "id": len(USER_DATA["meals"]) + 1,
             "name": analysis.get("food_name", "Scanned Food"),
             "quantity": analysis.get("quantity", "1 serving"),
             "calories": analysis.get("calories", 0),
@@ -372,18 +354,19 @@ async def scan_food_image(file: UploadFile = File(...)):
             "timestamp": datetime.now().isoformat(),
             "analysis": analysis
         }
-        USER_DATA["meals"].append(entry)
         credits_earned = _calculate_credits(entry)
-        USER_DATA["credits"] += credits_earned
         entry["credits_earned"] = credits_earned
         
-        return JSONResponse(content={"success": True, "meal": entry, "total_credits": USER_DATA["credits"]})
+        db_manager.add_meal(entry)
+        
+        return JSONResponse(content={"success": True, "meal": entry})
     except Exception as e:
         return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
 
 @app.get("/api/meals")
 async def get_meals(date: Optional[str] = None):
-    meals = USER_DATA["meals"]
+    data = db_manager.get_user_data()
+    meals = data.get("meals", [])
     if date:
         meals = [m for m in meals if m["date"] == date]
     return JSONResponse(content={"meals": meals})
@@ -401,29 +384,22 @@ async def log_calories_burned(data: CaloriesBurned):
 # ─── API: Credits ─────────────────────────────────────────────────────────────
 @app.get("/api/credits")
 async def get_credits():
-    cheat_threshold = 500
-    return JSONResponse(content={
-        "credits": USER_DATA["credits"],
-        "cheat_threshold": cheat_threshold,
-        "progress_pct": min(100, round((USER_DATA["credits"] / cheat_threshold) * 100, 1)),
-        "cheat_unlocked": USER_DATA["credits"] >= cheat_threshold,
-        "rewards": _get_rewards(USER_DATA["credits"])
-    })
+    stats = db_manager.get_credits()
+    return JSONResponse(content=stats)
 
 # ─── API: Health Prediction ───────────────────────────────────────────────────
 @app.get("/api/predict")
 async def health_prediction():
+    user_data = db_manager.get_user_data()
     today = datetime.now().strftime("%Y-%m-%d")
     last_7 = [(datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(7)]
     
-    calories_in = sum(m["calories"] for m in USER_DATA["meals"] if m["date"] in last_7)
-    calories_out_data = [e for e in USER_DATA["calories_burned"] if e["date"] in last_7]
-    calories_out = sum(e["amount"] for e in calories_out_data)
+    calories_in = sum(m["calories"] for m in user_data.get("meals", []) if m["date"] in last_7)
+    calories_out = sum(e["amount"] for e in user_data.get("activity_log", []) if e["date"] in last_7)
     
     daily_avg_in = calories_in / 7 if calories_in else 2000
     daily_avg_out = calories_out / 7 if calories_out else 1800
     
-    # Formula: ((Cal In - Cal Out) × 30) / 7700
     net_daily = daily_avg_in - daily_avg_out
     weight_change_30d = (net_daily * 30) / 7700
     
@@ -450,8 +426,9 @@ async def monthly_report(month: Optional[str] = None):
     if not month:
         month = datetime.now().strftime("%Y-%m")
     
-    monthly_meals = [m for m in USER_DATA["meals"] if m["date"].startswith(month)]
-    monthly_burned = [e for e in USER_DATA["calories_burned"] if e["date"].startswith(month)]
+    user_data = db_manager.get_user_data()
+    monthly_meals = [m for m in user_data.get("meals", []) if m["date"].startswith(month)]
+    monthly_burned = [e for e in user_data.get("activity_log", []) if e["date"].startswith(month)]
     
     total_in = sum(m["calories"] for m in monthly_meals)
     total_out = sum(e["amount"] for e in monthly_burned)
@@ -463,7 +440,6 @@ async def monthly_report(month: Optional[str] = None):
         g = m.get("grade", "C")
         grade_counts[g] = grade_counts.get(g, 0) + 1
     
-    # Use Gemini for smart report summary
     report_context = {
         "total_calories_in": total_in,
         "total_calories_out": total_out,
@@ -560,13 +536,11 @@ class OrderPost(BaseModel):
     cost: Optional[float] = 0
 
 @app.post("/api/orders")
+@app.post("/api/orders")
 async def add_order(order: OrderPost):
     try:
-        logger.info(f"Adding order: {order.food_name} from {order.platform}")
         analysis = await gemini.analyze_food(order.food_name, "1 order")
-        
         entry = {
-            "id": f"FF-{len(USER_DATA['orders'])+1:04d}",
             "source": order.platform,
             "platform": order.platform,
             "food_name": order.food_name,
@@ -579,11 +553,10 @@ async def add_order(order: OrderPost):
             "timestamp": datetime.now().isoformat(),
             "status": "logged"
         }
-        USER_DATA["orders"].append(entry)
+        db_manager.add_order(entry)
         
         # Auto-log to meals
         meal_entry = {
-            "id": len(USER_DATA["meals"]) + 1,
             "name": order.food_name,
             "quantity": "1 order",
             "calories": entry["calories"],
@@ -595,9 +568,9 @@ async def add_order(order: OrderPost):
             "timestamp": entry["timestamp"],
             "analysis": analysis
         }
-        USER_DATA["meals"].append(meal_entry)
         credits = _calculate_credits(meal_entry)
-        USER_DATA["credits"] += credits
+        meal_entry["credits_earned"] = credits
+        db_manager.add_meal(meal_entry)
         
         return JSONResponse(content={"success": True, "order": entry, "credits_earned": credits})
     except Exception as e:
@@ -628,7 +601,8 @@ async def webhook_order(order: WebhookOrder):
 
 @app.get("/api/orders")
 async def get_orders(source: Optional[str] = None, date: Optional[str] = None):
-    orders = USER_DATA["orders"]
+    user_data = db_manager.get_user_data()
+    orders = user_data.get("orders", [])
     if source:
         orders = [o for o in orders if o["source"] == source]
     if date:
@@ -673,11 +647,12 @@ def _get_rewards(credits: int) -> list:
 
 def _get_daily_breakdown(month: str) -> list:
     from collections import defaultdict
+    user_data = db_manager.get_user_data()
     daily = defaultdict(lambda: {"calories_in": 0, "calories_out": 0})
-    for m in USER_DATA["meals"]:
+    for m in user_data.get("meals", []):
         if m["date"].startswith(month):
             daily[m["date"]]["calories_in"] += m["calories"]
-    for e in USER_DATA["calories_burned"]:
+    for e in user_data.get("activity_log", []):
         if e["date"].startswith(month):
             daily[e["date"]]["calories_out"] += e["amount"]
     return [{"date": k, **v} for k, v in sorted(daily.items())]
