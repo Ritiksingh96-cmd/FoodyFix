@@ -1,0 +1,35 @@
+# Google Cloud Run deployment configuration
+runtime: python311
+
+env_variables:
+  PORT: 8080
+  ENVIRONMENT: production
+
+# Automatic scaling
+automatic_scaling:
+  min_instances: 1
+  max_instances: 10
+
+# Resource allocation
+resources:
+  cpu: 1
+  memory: 1Gi
+  disk_size_gb: 10
+
+# Health check
+health_check:
+  enable: true
+  check_interval_sec: 30
+  timeout_sec: 4
+  healthy_threshold: 1
+  unhealthy_threshold: 2
+
+# Network configuration
+network:
+  session_affinity: true
+  ingress: all
+
+# Build configuration
+build:
+  python_version: "3.11"
+  requirements: requirements.txt

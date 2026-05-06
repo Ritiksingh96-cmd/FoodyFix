@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FoodyFix — Join the Revolution</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: { sans: ['Plus Jakarta Sans', 'Inter', 'sans-serif'] },
+        colors: { emerald: { 50: '#ecfdf5', 500: '#10b981', 600: '#059669', 700: '#047857' } }
+      }
+    }
+  }
+</script>
+<style>
+  body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #ffffff; color: #0f172a; overflow: hidden; }
+  .auth-gradient { background: radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.05) 0%, transparent 70%); }
+  .glass-card { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px); border: 1px solid rgba(0, 0, 0, 0.05); box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.1); }
+  .mesh-bg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0.3; background-image: 
+      radial-gradient(at 100% 0%, hsla(158, 81%, 91%, 1) 0, transparent 50%), 
+      radial-gradient(at 0% 100%, hsla(158, 81%, 91%, 1) 0, transparent 50%);
+  }
+</style>
+</head>
+<body class="min-h-screen flex items-center justify-center relative overflow-hidden" x-data="{ mode: 'login' }">
+
+<!-- Decorative Background -->
+<div class="mesh-bg"></div>
+<div class="absolute top-[-10%] right-[-5%] w-[40%] h-[40%] bg-emerald-500/5 blur-[120px] rounded-full"></div>
+<div class="absolute bottom-[-10%] left-[-5%] w-[40%] h-[40%] bg-emerald-500/5 blur-[120px] rounded-full"></div>
+
+<div class="max-w-6xl w-full mx-auto p-6 grid lg:grid-cols-2 gap-0 glass-card rounded-[3rem] overflow-hidden relative z-10">
+    
+    <!-- Left: Visual Side -->
+    <div class="hidden lg:block relative overflow-hidden">
+        <img src="/static/images/auth_side_visual_1778061532054.png" class="absolute inset-0 w-full h-full object-cover" alt="Health Aesthetic">
+        <div class="absolute inset-0 bg-gradient-to-t from-emerald-950/80 to-transparent"></div>
+        <div class="absolute bottom-16 left-16 right-16">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-black uppercase tracking-[0.3em] mb-6 backdrop-blur border border-white/10">
+                Neural Health Intelligence
+            </div>
+            <h2 class="text-4xl font-black text-white leading-tight mb-4 tracking-tighter">Precision Nutrition for the Digital Age.</h2>
+            <p class="text-emerald-100/70 font-medium leading-relaxed">Join 12,000+ architects tracking their metabolic journey with Gemini-powered insights.</p>
+        </div>
+        
+        <!-- Logo Overlay -->
+        <a href="/" class="absolute top-12 left-12 flex items-center gap-3">
+            <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center font-black text-emerald-600 text-lg shadow-xl">F</div>
+            <span class="text-2xl font-black tracking-tighter text-white">FoodyFix</span>
+        </a>
+    </div>
+
+    <!-- Right: Form Side -->
+    <div class="p-16 md:p-24 bg-white flex flex-col justify-center">
+        <!-- Logo for Mobile -->
+        <a href="/" class="lg:hidden flex items-center gap-3 mb-12">
+            <div class="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center font-black text-white text-lg shadow-xl">F</div>
+            <span class="text-2xl font-black tracking-tight text-slate-900">FoodyFix</span>
+        </a>
+
+        <div x-show="mode === 'login'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4">
+            <h1 class="text-5xl font-black text-slate-900 mb-2 tracking-tighter">Welcome</h1>
+            <p class="text-slate-500 font-bold mb-12 uppercase tracking-widest text-[10px]">Synchronise your credentials</p>
+
+            <form action="/dashboard" class="space-y-6">
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Email Address</label>
+                    <input type="email" id="login-email" placeholder="architect@foodyfix.ai" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-8 py-5 text-slate-900 font-bold focus:outline-none focus:border-emerald-500 transition-all text-lg">
+                </div>
+                <div>
+                    <div class="flex justify-between items-center mb-4">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Access Key</label>
+                        <a href="#" class="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Recovery?</a>
+                    </div>
+                    <input type="password" id="login-password" placeholder="••••••••" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-8 py-5 text-slate-900 font-bold focus:outline-none focus:border-emerald-500 transition-all text-lg">
+                </div>
+                <div class="flex items-center gap-3">
+                    <input type="checkbox" id="remember" class="w-4 h-4 rounded border-slate-200 text-emerald-500 focus:ring-emerald-500">
+                    <label for="remember" class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Persistent Session</label>
+                </div>
+                <button type="submit" class="w-full bg-slate-900 text-white font-black py-6 rounded-2xl shadow-2xl shadow-slate-900/20 hover:bg-slate-800 transition-all active:scale-[0.98] uppercase tracking-[0.2em] text-xs">
+                    Sign In to Architecture
+                </button>
+            </form>
+
+            <div class="mt-12 flex items-center gap-6">
+                <div class="flex-1 h-px bg-slate-100"></div>
+                <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">External Identity</span>
+                <div class="flex-1 h-px bg-slate-100"></div>
+            </div>
+
+            <div class="mt-12 grid grid-cols-2 gap-6">
+                <button onclick="googleLogin()" class="flex items-center justify-center gap-4 px-8 py-5 border-2 border-slate-100 rounded-2xl font-black text-slate-900 hover:bg-slate-50 transition-all text-xs uppercase tracking-widest">
+                    <img src="https://www.svgrepo.com/show/355037/google.svg" class="w-5 h-5" alt="Google">
+                    Google
+                </button>
+                <button class="flex items-center justify-center gap-4 px-8 py-5 border-2 border-slate-100 rounded-2xl font-black text-slate-900 hover:bg-slate-50 transition-all text-xs uppercase tracking-widest">
+                    <img src="https://www.svgrepo.com/show/330043/apple.svg" class="w-5 h-5" alt="Apple">
+                    Apple
+                </button>
+            </div>
+
+            <p class="mt-16 text-center text-xs font-black text-slate-400 uppercase tracking-widest">
+                No Identity? <button @click="mode = 'signup'" class="text-emerald-600 hover:underline">Create Profile</button>
+            </p>
+        </div>
+
+        <div x-show="mode === 'signup'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-cloak>
+            <h1 class="text-5xl font-black text-slate-900 mb-2 tracking-tighter">Register</h1>
+            <p class="text-slate-500 font-bold mb-12 uppercase tracking-widest text-[10px]">Create your metabolic profile</p>
+
+            <form action="/dashboard" class="space-y-6">
+                <div class="grid grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">First Name</label>
+                        <input type="text" placeholder="John" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-8 py-5 text-slate-900 font-bold focus:outline-none focus:border-emerald-500 transition-all text-lg">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Last Name</label>
+                        <input type="text" placeholder="Doe" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-8 py-5 text-slate-900 font-bold focus:outline-none focus:border-emerald-500 transition-all text-lg">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Email Address</label>
+                    <input type="email" id="signup-email" placeholder="architect@foodyfix.ai" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-8 py-5 text-slate-900 font-bold focus:outline-none focus:border-emerald-500 transition-all text-lg">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Set Password</label>
+                    <input type="password" id="signup-password" placeholder="••••••••" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-8 py-5 text-slate-900 font-bold focus:outline-none focus:border-emerald-500 transition-all text-lg">
+                </div>
+                <p class="text-[10px] font-bold text-slate-400 leading-relaxed uppercase tracking-widest">
+                    By registering, you accept our <a href="#" class="text-emerald-600 underline">Protocol</a>.
+                </p>
+                <button type="submit" class="w-full bg-emerald-500 text-white font-black py-6 rounded-2xl shadow-2xl shadow-emerald-500/20 hover:bg-emerald-600 transition-all active:scale-[0.98] uppercase tracking-[0.2em] text-xs">
+                    Create Profile
+                </button>
+            </form>
+
+            <p class="mt-16 text-center text-xs font-black text-slate-400 uppercase tracking-widest">
+                Identified? <button @click="mode = 'login'" class="text-emerald-600 hover:underline">Sign In</button>
+            </p>
+        </div>
+    </div>
+</div>
+
+<script>
+  // Firebase Configuration Placeholder
+  // Replace with your actual Firebase config from the console
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
+
+  // Initialize Firebase (Compat)
+  if (firebaseConfig.apiKey !== "YOUR_API_KEY") {
+    firebase.initializeApp(firebaseConfig);
+  }
+
+  function googleLogin() {
+    if (firebaseConfig.apiKey === "YOUR_API_KEY") {
+      alert("Firebase Config not set. Please add your credentials in auth.html.");
+      return;
+    }
+    const provider = new firebase.auth.GoogleAuthProvider();
+    firebase.auth().signInWithPopup(provider)
+      .then((result) => {
+        const user = result.user;
+        console.log("Logged in:", user);
+        window.location.href = "/dashboard";
+      }).catch((error) => {
+        console.error("Login Error:", error);
+      });
+  }
+</script>
+
+</body>
+</html>
