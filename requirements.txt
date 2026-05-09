@@ -7,3 +7,7 @@ google-generativeai
 requests
 python-dotenv
 pillow
+firebase-admin
+psutil
+httpx
+gunicorn

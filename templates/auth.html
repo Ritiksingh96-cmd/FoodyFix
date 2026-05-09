@@ -7,6 +7,7 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
 
 <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -50,13 +51,15 @@
                 Neural Health Intelligence
             </div>
             <h2 class="text-4xl font-black text-white leading-tight mb-4 tracking-tighter">Precision Nutrition for the Digital Age.</h2>
-            <p class="text-emerald-100/70 font-medium leading-relaxed">Join 12,000+ architects tracking their metabolic journey with Gemini-powered insights.</p>
+            <p class="text-emerald-100/70 font-medium leading-relaxed">Join 12,000+ architects tracking their metabolic journey with AI-powered insights.</p>
         </div>
         
         <!-- Logo Overlay -->
-        <a href="/" class="absolute top-12 left-12 flex items-center gap-3">
-            <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center font-black text-emerald-600 text-lg shadow-xl">F</div>
-            <span class="text-2xl font-black tracking-tighter text-white">FoodyFix</span>
+        <a href="/" class="absolute top-12 left-12 flex items-center gap-4 group">
+            <div class="w-12 h-12 bg-white/10 backdrop-blur-xl rounded-2xl flex items-center justify-center border border-white/20 shadow-2xl group-hover:bg-white/20 transition-all">
+                <img src="/static/images/logo_ai.png" class="w-8 h-8 rounded-xl" alt="FoodyFix">
+            </div>
+            <span class="text-3xl font-black tracking-tighter text-white">FoodyFix</span>
         </a>
     </div>
 
@@ -64,7 +67,7 @@
     <div class="p-16 md:p-24 bg-white flex flex-col justify-center">
         <!-- Logo for Mobile -->
         <a href="/" class="lg:hidden flex items-center gap-3 mb-12">
-            <div class="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center font-black text-white text-lg shadow-xl">F</div>
+            <img src="/static/images/logo_ai.png" class="w-10 h-10 shadow-xl rounded-xl" alt="FoodyFix">
             <span class="text-2xl font-black tracking-tight text-slate-900">FoodyFix</span>
         </a>
 
@@ -88,7 +91,8 @@
                     <input type="checkbox" id="remember" class="w-4 h-4 rounded border-slate-200 text-emerald-500 focus:ring-emerald-500">
                     <label for="remember" class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Persistent Session</label>
                 </div>
-                <button type="submit" class="w-full bg-slate-900 text-white font-black py-6 rounded-2xl shadow-2xl shadow-slate-900/20 hover:bg-slate-800 transition-all active:scale-[0.98] uppercase tracking-[0.2em] text-xs">
+                <button type="submit" class="w-full bg-slate-900 text-white font-black py-6 rounded-2xl shadow-2xl shadow-slate-900/20 hover:bg-emerald-600 transition-all active:scale-[0.98] uppercase tracking-[0.3em] text-xs flex items-center justify-center gap-4">
+                    <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
                     Sign In to Architecture
                 </button>
             </form>
@@ -185,6 +189,7 @@
         console.error("Login Error:", error);
       });
   }
+  lucide.createIcons();
 </script>
 
 </body>

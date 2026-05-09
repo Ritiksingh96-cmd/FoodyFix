@@ -203,3 +203,28 @@ class GeminiEngine:
                 return await self._call_openrouter(prompt)
             except Exception:
                 return {"headline": "Keep going!", "recommendations": ["Log more meals"]}
+
+    async def generate_diet_plan(self, preferences: str, calories: int, diet_type: str, allergies: list) -> dict:
+        """Generate a personalized diet plan."""
+        prompt = (
+            f"Generate a 1-day professional diet plan. Target: {calories} calories. "
+            f"Diet Type: {diet_type}. Preferences: {preferences}. Allergies: {', '.join(allergies)}. "
+            "Respond ONLY with JSON: {"
+            "\"title\": \"Plan Name\", "
+            "\"meals\": ["
+            "{\"type\": \"Breakfast\", \"name\": \"...\", \"calories\": 0, \"protein\": 0, \"notes\": \"...\"},"
+            "{\"type\": \"Lunch\", \"name\": \"...\", \"calories\": 0, \"protein\": 0, \"notes\": \"...\"},"
+            "{\"type\": \"Dinner\", \"name\": \"...\", \"calories\": 0, \"protein\": 0, \"notes\": \"...\"}"
+            "], "
+            "\"nutritional_summary\": \"...\", "
+            "\"why_it_works\": \"...\", "
+            "\"pro_tip\": \"...\""
+            "}"
+        )
+        try:
+            return await self._call_gemini({"contents": [{"parts": [{"text": prompt}]}]})
+        except Exception:
+            try:
+                return await self._call_openrouter(prompt)
+            except Exception:
+                return {"title": "Sample Plan", "meals": [], "error": "AI Plan generation failed."}

@@ -1,73 +1,43 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FoodyFix — User Intelligence Profile</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<script>
-  tailwind.config = {
-    theme: {
-      extend: {
-        fontFamily: { sans: ['Plus Jakarta Sans', 'Inter', 'sans-serif'] },
-        colors: { emerald: { 50: '#ecfdf5', 500: '#10b981', 600: '#059669', 700: '#047857' } }
-      }
-    }
-  }
-</script>
-<style>
-  body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #ffffff; color: #0f172a; }
-  .topo-bg { 
-    background-color: #ffffff;
-    background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 86c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zm66-3c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zm-46-45c.552 0 1-.448 1-1s-.448-1-1-1-1 .448-1 1 .448 1 1 1zm26 18c.552 0 1-.448 1-1s-.448-1-1-1-1 .448-1 1 .448 1 1 1zm16 18c.552 0 1-.448 1-1s-.448-1-1-1-1 .448-1 1 .448 1 1 1zm-44 26c.552 0 1-.448 1-1s-.448-1-1-1-1 .448-1 1 .448 1 1 1zm16-40c.552 0 1-.448 1-1s-.448-1-1-1-1 .448-1 1 .448 1 1 1zm0 20c.552 0 1-.448 1-1s-.448-1-1-1-1 .448-1 1 .448 1 1 1zm-8-10c.552 0 1-.448 1-1s-.448-1-1-1-1 .448-1 1 .448 1 1 1zm32-10c.552 0 1-.448 1-1s-.448-1-1-1-1 .448-1 1 .448 1 1 1zm-16-10c.552 0 1-.448 1-1s-.448-1-1-1-1 .448-1 1 .448 1 1 1zm32-10c.552 0 1-.448 1-1s-.448-1-1-1-1 .448-1 1 .448 1 1 1z' fill='%2310b981' fill-opacity='0.03' fill-rule='evenodd'/%3E%3C/svg%3E");
-  }
-  .bento-item { background: white; border-radius: 2.5rem; border: 1px solid #f1f5f9; box-shadow: 0 4px 20px -5px rgba(0, 0, 0, 0.05); overflow: hidden; }
-  
+{% extends "base.html" %}
+
+{% block title %}User Intelligence Profile{% endblock %}
+
+{% block styles %}
   /* Circular Credit Ring */
   .ring-chart { display: block; margin: 0 auto; width: 100%; max-width: 280px; }
   .ring-bg { fill: none; stroke: #f1f5f9; stroke-width: 2.5; }
   .ring-fill { fill: none; stroke-width: 2.5; stroke-linecap: round; transition: stroke-dasharray 1.5s cubic-bezier(0.4, 0, 0.2, 1); }
   .ring-label { fill: #0f172a; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; font-size: 0.55em; text-anchor: middle; }
   .ring-sub { fill: #64748b; font-family: 'Inter', sans-serif; font-size: 0.16em; text-anchor: middle; font-weight: 600; }
-  
   .reward-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
   .reward-card:hover { transform: translateY(-8px); border-color: #10b981; box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.05); }
-</style>
-</head>
-<body class="min-h-screen topo-bg">
+{% endblock %}
 
-<!-- Navigation -->
-<nav class="sticky top-0 z-50 bg-white/80 backdrop-blur-2xl border-b border-slate-100">
-  <div class="max-w-6xl mx-auto px-8 py-6 flex items-center justify-between">
-    <a href="/dashboard" class="flex items-center gap-4">
-      <div class="w-11 h-11 bg-emerald-500 rounded-2xl flex items-center justify-center font-black text-white text-xl shadow-lg">F</div>
-      <span class="text-2xl font-black tracking-tighter text-slate-900">Foody<span class="text-emerald-500">Fix</span></span>
-    </a>
-    <div class="flex items-center gap-4">
-        <a href="/dashboard" class="text-sm font-black text-slate-900 px-8 py-3 bg-slate-100 rounded-2xl hover:bg-slate-200 transition-all uppercase tracking-widest">Dashboard Core</a>
-    </div>
-  </div>
-</nav>
-
-<main class="max-w-6xl mx-auto px-8 py-20">
-  
+{% block content %}
   <!-- Profile Header -->
-  <section class="bento-item p-12 mb-12 relative overflow-hidden flex flex-col md:flex-row items-center gap-12 shadow-xl shadow-slate-100/50">
+  <section class="bento-item p-6 mb-6 relative overflow-hidden flex flex-col md:flex-row items-center gap-6 shadow-xl shadow-slate-100/50">
     <div class="absolute top-0 right-0 w-[500px] h-[500px] bg-emerald-500/5 blur-[120px] rounded-full -translate-y-1/2 translate-x-1/3"></div>
     
-    <div class="relative shrink-0">
-        <div class="w-40 h-40 rounded-[3rem] bg-slate-900 flex items-center justify-center text-white text-6xl font-black shadow-2xl">HA</div>
-        <div class="absolute -bottom-2 -right-2 w-12 h-12 bg-emerald-500 border-4 border-white rounded-2xl flex items-center justify-center text-2xl shadow-xl">⭐</div>
+    <div class="relative shrink-0 group cursor-pointer" onclick="document.getElementById('profile-upload').click()">
+        <div id="profile-avatar-large" class="w-32 h-32 rounded-[2.5rem] bg-slate-900 flex items-center justify-center text-white text-5xl font-black shadow-2xl overflow-hidden">
+            <span id="avatar-initials">HA</span>
+            <img id="avatar-img-large" class="w-full h-full object-cover hidden" alt="Profile">
+        </div>
+        <div class="absolute inset-0 bg-black/40 rounded-[2.5rem] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+            <span class="text-white text-[10px] font-bold uppercase tracking-widest">Update</span>
+        </div>
+        <div class="absolute -bottom-2 -right-2 w-10 h-10 bg-emerald-500 border-4 border-white rounded-2xl flex items-center justify-center text-white shadow-xl">
+            <i data-lucide="star" class="w-5 h-5 fill-current"></i>
+        </div>
+        <input type="file" id="profile-upload" class="hidden" accept="image/*" onchange="uploadProfileImage(this)">
     </div>
 
     <div class="flex-1 text-center md:text-left relative z-10">
-        <h1 class="text-5xl font-black text-slate-900 mb-3 tracking-tighter">Health Architect</h1>
-        <p class="text-slate-500 font-bold mb-8 uppercase tracking-widest text-xs">user@foodyfix.ai · Professional Elite</p>
-        <div class="flex flex-wrap justify-center md:justify-start gap-4">
-            <span class="px-6 py-2.5 rounded-2xl bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-[0.2em] border border-emerald-100 shadow-sm">🥗 Clean Ingestor</span>
-            <span class="px-6 py-2.5 rounded-2xl bg-blue-50 text-blue-700 text-[10px] font-black uppercase tracking-[0.2em] border border-blue-100 shadow-sm">🛡️ Metabolic Shield</span>
-            <span class="px-6 py-2.5 rounded-2xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-[0.2em] shadow-xl">Architect Status</span>
+        <h1 class="text-4xl font-black text-slate-900 mb-1 tracking-tighter" id="profile-name-display">Health Architect</h1>
+        <p class="text-slate-500 font-bold mb-4 uppercase tracking-widest text-[9px]" id="profile-email-display">user@foodyfix.ai · Professional Elite</p>
+        <div class="flex flex-wrap justify-center md:justify-start gap-3">
+            <span class="px-5 py-2 rounded-xl bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-[0.2em] border border-emerald-100 shadow-sm">🥗 Clean Ingestor</span>
+            <span class="px-5 py-2 rounded-xl bg-blue-50 text-blue-700 text-[10px] font-black uppercase tracking-[0.2em] border border-blue-100 shadow-sm">🛡️ Metabolic Shield</span>
         </div>
     </div>
 
@@ -87,11 +57,11 @@
     </div>
   </section>
 
-  <div class="grid lg:grid-cols-3 gap-12">
+  <div class="grid lg:grid-cols-3 gap-6">
     <!-- Credits Bento -->
-    <div class="lg:col-span-1 space-y-12">
-        <div class="bento-item p-12 text-center shadow-xl shadow-slate-100/50">
-            <h2 class="text-2xl font-black text-slate-900 mb-10 tracking-tighter">FoodyCredits</h2>
+    <div class="lg:col-span-1 space-y-6">
+        <div class="bento-item p-6 text-center shadow-xl shadow-slate-100/50">
+            <h2 class="text-xl font-black text-slate-900 mb-6 tracking-tighter">FoodyCredits</h2>
             <svg viewBox="0 0 36 36" class="ring-chart">
                 <path class="ring-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
                 <path class="ring-fill" stroke="#10b981" stroke-dasharray="0, 100" id="credit-ring"
@@ -102,8 +72,8 @@
             <p class="text-[10px] font-black text-slate-400 mt-10 uppercase tracking-[0.2em]" id="credit-msg">Unlock Milestone 1 at 500 Credits</p>
         </div>
 
-        <div class="bento-item p-12 shadow-xl shadow-slate-100/50">
-            <h3 class="text-xl font-black text-slate-900 mb-8 tracking-tighter">Credit Protocol</h3>
+        <div class="bento-item p-6 shadow-xl shadow-slate-100/50">
+            <h3 class="text-base font-black text-slate-900 mb-5 tracking-tighter">Credit Protocol</h3>
             <div class="space-y-8">
                 <div class="flex items-center gap-6">
                     <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center font-black text-xl border border-emerald-100">A</div>
@@ -124,57 +94,77 @@
     </div>
 
     <!-- Rewards & History Bento -->
-    <div class="lg:col-span-2 space-y-12">
-        <div class="bento-item p-12 shadow-xl shadow-slate-100/50">
-            <h2 class="text-3xl font-black text-slate-900 mb-10 tracking-tighter">Reward Inventory</h2>
+    <div class="lg:col-span-2 space-y-6">
+        <div class="bento-item p-8 shadow-xl shadow-slate-100/50">
+            <h2 class="text-2xl font-black text-slate-900 mb-6 tracking-tighter">Reward Inventory</h2>
             <div class="grid md:grid-cols-2 gap-8" id="rewards-grid">
                 <!-- Rewards here -->
             </div>
         </div>
 
-        <div class="bento-item p-12 shadow-xl shadow-slate-100/50">
-            <h2 class="text-3xl font-black text-slate-900 mb-10 tracking-tighter">Metabolic History</h2>
+        <div class="bento-item p-8 shadow-xl shadow-slate-100/50">
+            <h2 class="text-2xl font-black text-slate-900 mb-6 tracking-tighter">Metabolic History</h2>
             <div class="space-y-5" id="history-list">
                 <!-- History here -->
             </div>
         </div>
 
-        <div class="bento-item p-12 shadow-xl shadow-slate-100/50">
-            <h2 class="text-3xl font-black text-slate-900 mb-10 tracking-tighter">Architect Config</h2>
+        <div class="bento-item p-8 shadow-xl shadow-slate-100/50">
+            <h2 class="text-2xl font-black text-slate-900 mb-6 tracking-tighter">Architect Config</h2>
             <div class="grid md:grid-cols-2 gap-10">
                 <div>
-                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Daily Energy Target (kcal)</label>
-                    <input type="number" value="2000" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-8 py-5 text-slate-900 font-bold focus:outline-none focus:border-emerald-500 transition-all text-lg">
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Display Name</label>
+                    <input type="text" id="config-name" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-8 py-5 text-slate-900 font-bold focus:outline-none focus:border-emerald-500 transition-all text-lg">
                 </div>
                 <div>
-                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Metabolic Focus</label>
-                    <select class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-8 py-5 text-slate-900 font-bold focus:outline-none focus:border-emerald-500 transition-all appearance-none text-lg">
-                        <option>Hypertrophy (Gain)</option>
-                        <option>Maintenance</option>
-                        <option>Fat Loss (Deficit)</option>
-                    </select>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Daily Energy Target (kcal)</label>
+                    <input type="number" id="config-calories" value="2000" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-8 py-5 text-slate-900 font-bold focus:outline-none focus:border-emerald-500 transition-all text-lg">
                 </div>
             </div>
-            <button class="mt-12 bg-slate-900 text-white font-black py-6 px-12 rounded-[2rem] shadow-2xl shadow-slate-900/20 hover:bg-slate-800 transition-all active:scale-[0.98] uppercase tracking-[0.3em] text-xs">
+            <button onclick="updateConfig()" class="mt-12 bg-slate-900 text-white font-black py-6 px-12 rounded-[2rem] shadow-2xl shadow-slate-900/20 hover:bg-slate-800 transition-all active:scale-[0.98] uppercase tracking-[0.3em] text-xs">
                 Synchronise Protocol
             </button>
         </div>
     </div>
   </div>
-</main>
+{% endblock %}
 
+{% block scripts %}
 <script>
-async function load() {
-    const [creds, meals] = await Promise.all([
+async function loadProfileView() {
+    const [creds, mealsRes, profileRes] = await Promise.all([
         fetch('/api/credits').then(r => r.json()),
-        fetch('/api/meals').then(r => r.json())
+        fetch('/api/meals').then(r => r.json()),
+        fetch('/api/profile').then(r => r.json())
     ]);
 
-    document.getElementById('stat-meals').textContent = meals.meals.length;
+    const profile = profileRes.profile;
+    const meals = mealsRes.meals;
+
+    document.getElementById('profile-name-display').textContent = profile.name;
+    document.getElementById('profile-email-display').textContent = `${profile.email} · Professional Elite`;
+    
+    const avatarImg = document.getElementById('avatar-img-large');
+    const avatarInitials = document.getElementById('avatar-initials');
+    
+    if (profile.photo_url) {
+        avatarImg.src = profile.photo_url;
+        avatarImg.classList.remove('hidden');
+        avatarInitials.classList.add('hidden');
+    } else {
+        avatarInitials.textContent = profile.name.split(' ').map(n=>n[0]).join('').toUpperCase();
+        avatarImg.classList.add('hidden');
+        avatarInitials.classList.remove('hidden');
+    }
+
+    document.getElementById('stat-meals').textContent = meals.length;
     document.getElementById('stat-credits').textContent = creds.credits;
     document.getElementById('credit-label').textContent = creds.credits;
     document.getElementById('credit-ring').setAttribute('stroke-dasharray', `${creds.progress_pct}, 100`);
     document.getElementById('credit-sub-label').textContent = `${creds.credits} / ${creds.cheat_threshold}`;
+    
+    document.getElementById('config-name').value = profile.name;
+    document.getElementById('config-calories').value = profile.goals?.daily_calories || 2000;
 
     const rewardsGrid = document.getElementById('rewards-grid');
     rewardsGrid.innerHTML = (creds.rewards || []).map(r => `
@@ -190,7 +180,7 @@ async function load() {
     `).join('');
 
     const historyList = document.getElementById('history-list');
-    const recent = [...meals.meals].reverse().slice(0, 5);
+    const recent = [...meals].reverse().slice(0, 5);
     const themes = { A: 'text-emerald-600 border-emerald-100 bg-emerald-50', B: 'text-blue-600 border-blue-100 bg-blue-50', C: 'text-amber-600 border-amber-100 bg-amber-50', D: 'text-rose-600 border-rose-100 bg-rose-50', F: 'text-slate-600 border-slate-100 bg-slate-50' };
 
     historyList.innerHTML = recent.map(m => `
@@ -208,8 +198,42 @@ async function load() {
             </div>
         </div>
     `).join('');
+
+    lucide.createIcons();
 }
-load();
+
+async function uploadProfileImage(input) {
+    if (!input.files || !input.files[0]) return;
+    const formData = new FormData();
+    formData.append('file', input.files[0]);
+    try {
+        const res = await fetch('/api/profile/upload', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success) {
+            syncPortalData();
+            loadProfileView();
+        } else {
+            alert('Upload failed: ' + data.error);
+        }
+    } catch (e) { console.error(e); }
+}
+
+async function updateConfig() {
+    const name = document.getElementById('config-name').value;
+    const calories = document.getElementById('config-calories').value;
+    try {
+        await fetch('/api/profile', {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ name, daily_calories: parseInt(calories) })
+        });
+        syncPortalData();
+        loadProfileView();
+    } catch (e) { console.error(e); }
+}
+
+window.onPortalSync = () => {
+    loadProfileView();
+};
 </script>
-</body>
-</html>
+{% endblock %}

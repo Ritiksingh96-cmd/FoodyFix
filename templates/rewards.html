@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+
+{% block title %}Reward Protocol{% endblock %}
+
+{% block styles %}
+  .progress-ring { transition: stroke-dashoffset 0.35s; transform: rotate(-90deg); transform-origin: 50% 50%; }
+{% endblock %}
+
+{% block content %}
+  <header class="mb-12">
+    <div class="inline-flex items-center gap-3 px-4 py-1.5 rounded-full bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase tracking-[0.3em] mb-4 border border-emerald-100">
+        Behavioral Incentive Protocol
+    </div>
+    <h1 class="text-4xl font-black text-slate-900 mb-2 tracking-tighter">Rewards & Milestones</h1>
+    <p class="text-slate-500 font-medium text-sm">Set goals, build streaks, and unlock cheat meal rewards.</p>
+  </header>
+
+  <div class="grid lg:grid-cols-12 gap-8">
+    <!-- Active Goal & Progress -->
+    <div class="lg:col-span-8 space-y-8">
+        <div class="bento-item p-10 bg-slate-900 text-white relative overflow-hidden shadow-2xl shadow-slate-900/20">
+            <div class="absolute -right-20 -top-20 w-80 h-80 bg-emerald-500/10 blur-[100px] rounded-full"></div>
+            
+            <div class="relative z-10 flex flex-col md:flex-row items-center gap-12">
+                <div class="relative w-48 h-48 flex items-center justify-center">
+                    <svg class="w-full h-full" viewBox="0 0 192 192">
+                        <circle class="text-white/10" stroke-width="12" stroke="currentColor" fill="transparent" r="80" cx="96" cy="96" />
+                        <circle id="progress-circle" class="text-emerald-500 progress-ring" stroke-width="12" stroke-dasharray="502.6" stroke-dashoffset="502.6" stroke-linecap="round" stroke="currentColor" fill="transparent" r="80" cx="96" cy="96" />
+                    </svg>
+                    <div class="absolute inset-0 flex flex-col items-center justify-center">
+                        <span class="text-5xl font-black" id="streak-count">0</span>
+                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Day Streak</span>
+                    </div>
+                </div>
+
+                <div class="flex-1 text-center md:text-left">
+                    <h3 class="text-[10px] font-black text-emerald-400 uppercase tracking-[0.4em] mb-4" id="goal-title">No Active Goal</h3>
+                    <h2 class="text-3xl font-black mb-6 tracking-tighter" id="goal-status">Set a new milestone to start earning.</h2>
+                    <div id="progress-bar-container" class="hidden">
+                        <div class="w-full bg-white/10 h-3 rounded-full mb-4">
+                            <div id="goal-progress" class="bg-emerald-500 h-3 rounded-full transition-all duration-1000" style="width: 0%"></div>
+                        </div>
+                        <p class="text-xs font-bold text-slate-400" id="goal-days-left">0 days remaining until reward</p>
+                    </div>
+                    <button onclick="document.getElementById('goal-modal').classList.remove('hidden')" id="start-goal-btn" class="mt-4 px-8 py-4 bg-emerald-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-emerald-400 transition-all shadow-xl shadow-emerald-500/20">
+                        Initialise Goal
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid md:grid-cols-2 gap-8">
+            <div class="bento-item p-8 flex items-center gap-6">
+                <div class="w-16 h-16 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center">
+                    <i data-lucide="utensils" class="w-8 h-8"></i>
+                </div>
+                <div>
+                    <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Cheat Meals Available</div>
+                    <div class="text-3xl font-black text-slate-900" id="cheat-meal-count">0</div>
+                </div>
+            </div>
+            <div class="bento-item p-8 flex items-center gap-6">
+                <div class="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center">
+                    <i data-lucide="award" class="w-8 h-8"></i>
+                </div>
+                <div>
+                    <div class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Foody Credits</div>
+                    <div class="text-3xl font-black text-slate-900" id="total-credits-display">0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rewards Shop/List -->
+    <div class="lg:col-span-4 space-y-8">
+        <div class="bento-item p-8">
+            <h3 class="text-xl font-black text-slate-900 mb-8 tracking-tighter">Reward Tiers</h3>
+            <div class="space-y-6">
+                <div class="flex items-center gap-4 p-4 rounded-2xl border border-slate-50 hover:border-emerald-100 transition-all">
+                    <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center">
+                        <i data-lucide="ticket" class="w-6 h-6"></i>
+                    </div>
+                    <div class="flex-1">
+                        <div class="text-sm font-black text-slate-900">Cheat Meal Voucher</div>
+                        <div class="text-[10px] font-bold text-slate-400 uppercase">Complete 7-Day Streak</div>
+                    </div>
+                    <i data-lucide="lock" class="w-4 h-4 text-slate-300"></i>
+                </div>
+                <div class="flex items-center gap-4 p-4 rounded-2xl border border-slate-50 opacity-50">
+                    <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">
+                        <i data-lucide="book-open" class="w-6 h-6"></i>
+                    </div>
+                    <div class="flex-1">
+                        <div class="text-sm font-black text-slate-900">Pro Recipe Pack</div>
+                        <div class="text-[10px] font-bold text-slate-400 uppercase">1,000 Credits</div>
+                    </div>
+                    <i data-lucide="lock" class="w-4 h-4 text-slate-300"></i>
+                </div>
+                <div class="flex items-center gap-4 p-4 rounded-2xl border border-slate-50 opacity-50">
+                    <div class="w-12 h-12 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center">
+                        <i data-lucide="brain-circuit" class="w-6 h-6"></i>
+                    </div>
+                    <div class="flex-1">
+                        <div class="text-sm font-black text-slate-900">Mental Wellness Kit</div>
+                        <div class="text-[10px] font-bold text-slate-400 uppercase">2,500 Credits</div>
+                    </div>
+                    <i data-lucide="lock" class="w-4 h-4 text-slate-300"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="bento-item p-8 bg-emerald-50 border-emerald-100">
+            <div class="flex items-center gap-4 mb-4">
+                <i data-lucide="info" class="w-5 h-5 text-emerald-600"></i>
+                <h4 class="text-xs font-black text-emerald-900 uppercase tracking-widest">How it works</h4>
+            </div>
+            <p class="text-xs text-emerald-700 font-medium leading-relaxed">
+                Complete your daily health goals (logging clean meals) to build your streak. Reach your target days to unlock a verified **Cheat Meal Reward** without affecting your metabolic grade.
+            </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Goal Modal -->
+    <div id="goal-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center p-8">
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="this.parentElement.classList.add('hidden')"></div>
+        <div class="relative bg-white w-full max-w-md rounded-[3rem] p-12 shadow-2xl">
+            <h2 class="text-3xl font-black text-slate-900 mb-8 tracking-tighter">Set Health Goal</h2>
+            <div class="space-y-6">
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Goal Name</label>
+                    <input type="text" id="goal-name" placeholder="e.g. Clean Eating Week" class="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 font-bold text-slate-900 focus:outline-none focus:border-emerald-500 transition-all">
+                </div>
+                <div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Duration (Days)</label>
+                    <select id="goal-days" class="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 font-bold text-slate-900 focus:outline-none focus:border-emerald-500 transition-all">
+                        <option value="3">3 Days (Quick Sprint)</option>
+                        <option value="7" selected>7 Days (Standard Cycle)</option>
+                        <option value="14">14 Days (Habit Anchor)</option>
+                        <option value="30">30 Days (Metabolic Shift)</option>
+                    </select>
+                </div>
+                <button onclick="setGoal()" class="w-full py-5 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-xl shadow-slate-900/10 mt-4">
+                    Deploy Goal Protocol
+                </button>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadStatus() {
+    try {
+        const res = await fetch('/api/rewards/status');
+        const data = await res.json();
+        const rewards = data.rewards;
+
+        document.getElementById('streak-count').textContent = rewards.streak;
+        document.getElementById('cheat-meal-count').textContent = rewards.cheat_meals_available;
+        document.getElementById('total-credits-display').textContent = data.total_credits;
+
+        // Update Circle Progress
+        const circle = document.getElementById('progress-circle');
+        const circumference = 502.6; // 2 * PI * 80
+        const offset = circumference - (rewards.progress / 100 * circumference);
+        circle.style.strokeDashoffset = offset;
+
+        if (rewards.current_goal) {
+            document.getElementById('goal-title').textContent = rewards.current_goal.name;
+            document.getElementById('goal-status').textContent = `${Math.round(rewards.progress)}% Achievement Reached`;
+            document.getElementById('progress-bar-container').classList.remove('hidden');
+            document.getElementById('goal-progress').style.width = rewards.progress + '%';
+            document.getElementById('goal-days-left').textContent = `${rewards.current_goal.target_days - rewards.streak} days remaining until reward`;
+            document.getElementById('start-goal-btn').classList.add('hidden');
+            
+            if (rewards.progress >= 100) {
+                document.getElementById('goal-status').textContent = "Goal Achieved! Claim Your Cheat Meal.";
+                document.getElementById('start-goal-btn').textContent = "Claim Reward";
+                document.getElementById('start-goal-btn').onclick = claimReward;
+                document.getElementById('start-goal-btn').classList.remove('hidden');
+            }
+        } else {
+            document.getElementById('goal-title').textContent = "No Active Protocol";
+            document.getElementById('goal-status').textContent = "Set a health goal to begin your streak.";
+            document.getElementById('progress-bar-container').classList.add('hidden');
+            document.getElementById('start-goal-btn').textContent = "Deploy Goal Protocol";
+            document.getElementById('start-goal-btn').onclick = () => document.getElementById('goal-modal').classList.remove('hidden');
+            document.getElementById('start-goal-btn').classList.remove('hidden');
+        }
+    } catch (e) {
+        console.error("Rewards status error:", e);
+    }
+    lucide.createIcons();
+}
+
+async function setGoal() {
+    const name = document.getElementById('goal-name').value;
+    const days = document.getElementById('goal-days').value;
+    if (!name) return;
+
+    await fetch('/api/rewards/goal', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({goal_name: name, target_days: parseInt(days)})
+    });
+    
+    document.getElementById('goal-modal').classList.add('hidden');
+    loadStatus();
+}
+
+async function claimReward() {
+    const res = await fetch('/api/rewards/claim-cheat-meal', {method: 'POST'});
+    const data = await res.json();
+    if (data.success) {
+        alert("🎉 CONGRATULATIONS! Your Cheat Meal is unlocked.");
+        loadStatus();
+        syncPortalData(); // Update sidebar credits
+    }
+}
+
+window.onPortalSync = () => {
+    loadStatus();
+};
+</script>
+{% endblock %}

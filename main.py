@@ -3,6 +3,9 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+import io
+import csv
 from pydantic import BaseModel, validator
 from typing import Optional, List, Dict, Any
 import os, json, logging, asyncio
@@ -86,7 +89,13 @@ templates = Jinja2Templates(directory="templates")
 gemini = GeminiEngine()
 
 # Firestore is now used via db_manager
-# USER_DATA is kept as a local cache or removed where possible
+# USER_DATA is used for session management and transient state
+# Global Data (Migrating to Firestore via db_manager)
+# We keep these for transient session state if needed, but primary data is in db_manager
+USER_ID = "demo_user"
+USER_DATA = {
+    "user_sessions": {}
+}
 
 # ─── Pydantic Models ──────────────────────────────────────────────────────────
 class FoodQuery(BaseModel):
@@ -127,6 +136,7 @@ class UserProfile(BaseModel):
     daily_calories: Optional[int] = None
     target_weight: Optional[float] = None
     activity_level: Optional[str] = None
+    photo_url: Optional[str] = None
 
 class HealthGoal(BaseModel):
     target_weight: Optional[float] = None
@@ -148,34 +158,53 @@ class RegisterRequest(BaseModel):
     password: str
     display_name: Optional[str] = None
 
+class HealthGoalRequest(BaseModel):
+    goal_name: str
+    target_days: int = 7
+    description: Optional[str] = ""
+
+class DietPlanRequest(BaseModel):
+    preferences: str
+    target_calories: Optional[int] = 2000
+    diet_type: Optional[str] = "Balanced"
+    allergies: Optional[List[str]] = []
+
 # ─── Routes ───────────────────────────────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse)
 async def guest_portal(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="index.html", context={})
 
 @app.get("/auth", response_class=HTMLResponse)
 async def auth_page(request: Request):
-    return templates.TemplateResponse("auth.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="auth.html", context={})
 
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request):
-    return templates.TemplateResponse("dashboard.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="dashboard.html", context={})
 
 @app.get("/orders", response_class=HTMLResponse)
 async def orders_page(request: Request):
-    return templates.TemplateResponse("orders.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="orders.html", context={})
 
 @app.get("/reports", response_class=HTMLResponse)
 async def reports_page(request: Request):
-    return templates.TemplateResponse("reports.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="reports.html", context={})
 
 @app.get("/scan", response_class=HTMLResponse)
 async def scan_page(request: Request):
-    return templates.TemplateResponse("scan.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="scan.html", context={})
+
+@app.get("/rewards", response_class=HTMLResponse)
+async def rewards_page(request: Request):
+    return templates.TemplateResponse(request=request, name="rewards.html", context={})
 
 @app.get("/profile", response_class=HTMLResponse)
 async def profile_page(request: Request):
-    return templates.TemplateResponse("profile.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="profile.html", context={})
+
+@app.get("/diet", response_class=HTMLResponse)
+async def diet_page(request: Request):
+    return templates.TemplateResponse(request=request, name="diet.html", context={})
 
 # ─── Firebase Authentication Endpoints ─────────────────────────────────────
 @app.post("/api/auth/login")
@@ -270,27 +299,34 @@ async def get_current_user(request: Request):
 async def health_check():
     """Health check endpoint for monitoring"""
     try:
-        # Check system resources
-        cpu_percent = psutil.cpu_percent()
-        memory = psutil.virtual_memory()
+        system_info = {}
+        try:
+            import psutil
+            system_info = {
+                "cpu_percent": psutil.cpu_percent(),
+                "memory_percent": psutil.virtual_memory().percent,
+            }
+        except Exception:
+            system_info = {"note": "psutil unavailable"}
         
-        # Check Firebase connection
-        firebase_status = "connected" if firebase_app else "not_configured"
+        firebase_status = "not_configured"
+        try:
+            if firebase_app:
+                firebase_status = "connected"
+        except NameError:
+            firebase_status = "not_initialized"
         
         return JSONResponse(content={
             "status": "healthy",
             "timestamp": datetime.now().isoformat(),
             "version": "1.0.0",
             "environment": os.getenv('ENVIRONMENT', 'development'),
-            "system": {
-                "cpu_percent": cpu_percent,
-                "memory_percent": memory.percent,
-                "memory_available_gb": round(memory.available / (1024**3), 2)
-            },
+            "system": system_info,
             "services": {
                 "firebase": firebase_status,
                 "gemini_api": "configured" if os.getenv('GEMINI_API_KEY') else "not_configured"
             }
+
         })
     except Exception as e:
         logger.error(f"Health check failed: {str(e)}")
@@ -335,8 +371,13 @@ async def log_meal(meal: MealLog):
     entry["credits_earned"] = credits_earned
     
     db_manager.add_meal(entry)
+    stats = db_manager.get_credits()
     
-    return JSONResponse(content={"success": True, "meal": entry})
+    return JSONResponse(content={
+        "success": True, 
+        "meal": entry,
+        "total_credits": stats["credits"]
+    })
 
 @app.post("/api/scan")
 async def scan_food_image(file: UploadFile = File(...)):
@@ -376,12 +417,9 @@ async def get_meals(date: Optional[str] = None):
 # ─── API: Calories Burned ─────────────────────────────────────────────────────
 @app.post("/api/calories-burned")
 async def log_calories_burned(data: CaloriesBurned):
-    existing = next((e for e in USER_DATA["calories_burned"] if e["date"] == data.date), None)
-    if existing:
-        existing["amount"] += data.amount
-    else:
-        USER_DATA["calories_burned"].append({"date": data.date, "amount": data.amount, "activity": data.activity})
-    return JSONResponse(content={"success": True, "data": USER_DATA["calories_burned"]})
+    entry = {"date": data.date, "amount": data.amount, "activity": data.activity}
+    db_manager.add_activity(entry)
+    return JSONResponse(content={"success": True})
 
 # ─── API: Credits ─────────────────────────────────────────────────────────────
 @app.get("/api/credits")
@@ -466,36 +504,99 @@ async def monthly_report(month: Optional[str] = None):
     
     return JSONResponse(content={"report": report})
 
+@app.get("/api/reports/download")
+async def download_monthly_report(month: Optional[str] = None):
+    if not month:
+        month = datetime.now().strftime("%Y-%m")
+    
+    user_data = db_manager.get_user_data()
+    monthly_meals = [m for m in user_data.get("meals", []) if m["date"].startswith(month)]
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Date", "Meal Name", "Quantity", "Calories", "Protein (g)", "Fat (g)", "Grade", "Reason"])
+    
+    for m in monthly_meals:
+        writer.writerow([
+            m.get("date"),
+            m.get("name"),
+            m.get("quantity"),
+            m.get("calories"),
+            m.get("protein"),
+            m.get("fat"),
+            m.get("grade"),
+            m.get("analysis", {}).get("grade_reason", "")
+        ])
+    
+    output.seek(0)
+    return StreamingResponse(
+        io.BytesIO(output.getvalue().encode()),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=FoodyFix_Report_{month}.csv"}
+    )
+
 # ─── API: User Profile ───────────────────────────────────────────────────────
 @app.get("/api/profile")
 async def get_user_profile():
+    data = db_manager.get_user_data(USER_ID)
+    profile = data.get("profile", {})
     return JSONResponse(content={
-        "profile": USER_DATA["user_profile"],
+        "profile": profile,
         "stats": {
-            "total_meals": len(USER_DATA["meals"]),
-            "total_orders": len(USER_DATA["orders"]),
-            "member_since": USER_DATA["user_profile"]["join_date"]
+            "total_meals": len(data.get("meals", [])),
+            "total_orders": len(data.get("orders", [])),
+            "member_since": "2026-05-01"
         }
     })
 
 @app.put("/api/profile")
 async def update_user_profile(profile: UserProfile):
     try:
-        if profile.name:
-            USER_DATA["user_profile"]["name"] = profile.name
-        if profile.email:
-            USER_DATA["user_profile"]["email"] = profile.email
-        if profile.daily_calories:
-            USER_DATA["user_profile"]["goals"]["daily_calories"] = profile.daily_calories
-        if profile.target_weight:
-            USER_DATA["user_profile"]["goals"]["target_weight"] = profile.target_weight
-        if profile.activity_level:
-            USER_DATA["user_profile"]["goals"]["activity_level"] = profile.activity_level
+        data = db_manager.get_user_data(USER_ID)
+        current_profile = data.get("profile", {})
         
-        return JSONResponse(content={"success": True, "profile": USER_DATA["user_profile"]})
+        if profile.name:
+            current_profile["name"] = profile.name
+        if profile.email:
+            current_profile["email"] = profile.email
+        if profile.daily_calories:
+            if "goals" not in current_profile: current_profile["goals"] = {}
+            current_profile["goals"]["daily_calories"] = profile.daily_calories
+        if profile.target_weight:
+            if "goals" not in current_profile: current_profile["goals"] = {}
+            current_profile["goals"]["target_weight"] = profile.target_weight
+        if profile.activity_level:
+            if "goals" not in current_profile: current_profile["goals"] = {}
+            current_profile["goals"]["activity_level"] = profile.activity_level
+        if profile.photo_url:
+            current_profile["photo_url"] = profile.photo_url
+        
+        db_manager.update_profile(current_profile, USER_ID)
+        return JSONResponse(content={"success": True, "profile": current_profile})
     except Exception as e:
         logger.error(f"Error updating profile: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to update profile")
+
+@app.post("/api/profile/upload")
+async def upload_profile_image(file: UploadFile = File(...)):
+    try:
+        os.makedirs("static/uploads", exist_ok=True)
+        filename = f"avatar_{int(datetime.now().timestamp())}_{file.filename}"
+        file_path = f"static/uploads/{filename}"
+        
+        with open(file_path, "wb") as f:
+            f.write(await file.read())
+            
+        photo_url = f"/static/uploads/{filename}"
+        data = db_manager.get_user_data(USER_ID)
+        profile = data.get("profile", {})
+        profile["photo_url"] = photo_url
+        db_manager.update_profile(profile, USER_ID)
+        
+        return JSONResponse(content={"success": True, "photo_url": photo_url})
+    except Exception as e:
+        logger.error(f"Error uploading profile image: {str(e)}")
+        return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
 # ─── API: Enhanced Health Stats ─────────────────────────────────────────────────
 @app.get("/api/health-stats")
 async def get_health_stats():
@@ -503,11 +604,14 @@ async def get_health_stats():
         today = datetime.now().strftime("%Y-%m-%d")
         last_7_days = [(datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(7)]
         
-        today_meals = [m for m in USER_DATA["meals"] if m["date"] == today]
-        week_meals = [m for m in USER_DATA["meals"] if m["date"] in last_7_days]
+        data = db_manager.get_user_data()
+        meals = data.get("meals", [])
         
-        today_calories = sum(m["calories"] for m in today_meals)
-        week_calories = sum(m["calories"] for m in week_meals)
+        today_meals = [m for m in meals if m["date"] == today]
+        week_meals = [m for m in meals if m["date"] in last_7_days]
+        
+        today_calories = sum(m.get("calories", 0) for m in today_meals)
+        week_calories = sum(m.get("calories", 0) for m in week_meals)
         
         # Calculate average health grade
         grades = [m.get("grade", "C") for m in week_meals]
@@ -537,11 +641,60 @@ class OrderPost(BaseModel):
     platform: str
     cost: Optional[float] = 0
 
+@app.post("/api/orders/manual")
+async def add_manual_order(order: ManualOrder):
+    try:
+        items_text = ", ".join([f"{i.quantity}x {i.name}" for i in order.items])
+        analysis = await gemini.analyze_food(items_text, "full order")
+        
+        entry = {
+            "id": f"FF-{datetime.now().strftime('%M%S')}",
+            "source": "manual",
+            "restaurant": order.restaurant,
+            "items": [i.dict() for i in order.items],
+            "total_calories": analysis.get("calories", 0),
+            "total_fat": analysis.get("fat_g", 0),
+            "total_protein": analysis.get("protein_g", 0),
+            "health_grade": analysis.get("health_grade", "C"),
+            "date": order.date or datetime.now().strftime("%Y-%m-%d"),
+            "timestamp": datetime.now().isoformat(),
+            "status": "logged"
+        }
+        db_manager.add_order(entry)
+        
+        # Auto-log to meals as a single entry
+        meal_entry = {
+            "name": f"Order from {order.restaurant}",
+            "quantity": f"{len(order.items)} items",
+            "calories": entry["total_calories"],
+            "fat": entry["total_fat"],
+            "protein": entry["total_protein"],
+            "grade": entry["health_grade"],
+            "date": entry["date"],
+            "timestamp": entry["timestamp"],
+            "analysis": analysis
+        }
+        credits = _calculate_credits(meal_entry)
+        meal_entry["credits_earned"] = credits
+        db_manager.add_meal(meal_entry)
+        
+        stats = db_manager.get_credits()
+        return JSONResponse(content={
+            "success": True, 
+            "order": entry, 
+            "credits_earned": credits,
+            "total_credits": stats["credits"]
+        })
+    except Exception as e:
+        logger.error(f"Error adding manual order: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/orders")
-@app.post("/api/orders")
-async def add_order(order: OrderPost):
+async def add_simple_order(order: OrderPost):
     try:
         analysis = await gemini.analyze_food(order.food_name, "1 order")
+        # ... existing logic for simple order if still needed ...
+        # For now, let's keep it but fix the duplicate decorator
         entry = {
             "source": order.platform,
             "platform": order.platform,
@@ -557,24 +710,27 @@ async def add_order(order: OrderPost):
         }
         db_manager.add_order(entry)
         
-        # Auto-log to meals
         meal_entry = {
             "name": order.food_name,
             "quantity": "1 order",
             "calories": entry["calories"],
             "fat": entry["fat_g"],
             "protein": entry["protein_g"],
-            "saturated_fat": analysis.get("saturated_fat_g", 0),
             "grade": entry["health_grade"],
             "date": entry["date"],
             "timestamp": entry["timestamp"],
             "analysis": analysis
         }
         credits = _calculate_credits(meal_entry)
-        meal_entry["credits_earned"] = credits
         db_manager.add_meal(meal_entry)
+        stats = db_manager.get_credits()
         
-        return JSONResponse(content={"success": True, "order": entry, "credits_earned": credits})
+        return JSONResponse(content={
+            "success": True, 
+            "order": entry, 
+            "credits_earned": credits,
+            "total_credits": stats["credits"]
+        })
     except Exception as e:
         logger.error(f"Error adding order: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to add order")
@@ -586,20 +742,38 @@ async def webhook_order(order: WebhookOrder):
     analysis = await gemini.analyze_food(items_text, "full order")
     
     entry = {
-        "id": f"FF-{len(USER_DATA['orders'])+1:04d}",
+        "id": f"FF-{datetime.now().strftime('%M%S')}",
         "source": order.source,
         "external_order_id": order.order_id,
         "restaurant": order.restaurant,
         "items": order.items,
         "total_calories": analysis.get("calories", 0),
         "total_fat": analysis.get("fat_g", 0),
+        "total_protein": analysis.get("protein_g", 0),
         "health_grade": analysis.get("health_grade", "C"),
         "date": (order.timestamp or datetime.now().isoformat())[:10],
         "timestamp": order.timestamp or datetime.now().isoformat(),
         "status": "synced"
     }
-    USER_DATA["orders"].append(entry)
-    return JSONResponse(content={"success": True, "order_id": entry["id"], "analysis": analysis})
+    db_manager.add_order(entry)
+    
+    # Auto-log to meals
+    meal_entry = {
+        "name": f"Order from {order.restaurant}",
+        "quantity": f"{len(order.items)} items",
+        "calories": entry["total_calories"],
+        "fat": entry["total_fat"],
+        "protein": entry["total_protein"],
+        "grade": entry["health_grade"],
+        "date": entry["date"],
+        "timestamp": entry["timestamp"],
+        "analysis": analysis
+    }
+    credits = _calculate_credits(meal_entry)
+    meal_entry["credits_earned"] = credits
+    db_manager.add_meal(meal_entry)
+    
+    return JSONResponse(content={"success": True, "order_id": entry["id"], "analysis": analysis, "credits_earned": credits})
 
 @app.get("/api/orders")
 async def get_orders(source: Optional[str] = None, date: Optional[str] = None):
@@ -610,6 +784,33 @@ async def get_orders(source: Optional[str] = None, date: Optional[str] = None):
     if date:
         orders = [o for o in orders if o["date"] == date]
     return JSONResponse(content={"orders": orders, "total": len(orders)})
+
+@app.get("/api/orders/download")
+async def download_orders():
+    user_data = db_manager.get_user_data()
+    orders = user_data.get("orders", [])
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Order ID", "Source", "Restaurant", "Date", "Calories", "Grade", "Status"])
+    
+    for o in orders:
+        writer.writerow([
+            o.get("id") or o.get("order_id") or "N/A",
+            o.get("source") or o.get("platform") or "manual",
+            o.get("restaurant") or o.get("food_name") or "Unknown",
+            o.get("date") or o.get("timestamp", "")[:10],
+            o.get("total_calories") or o.get("calories") or 0,
+            o.get("health_grade") or o.get("grade") or "C",
+            o.get("status") or "logged"
+        ])
+    
+    output.seek(0)
+    return StreamingResponse(
+        io.BytesIO(output.getvalue().encode()),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=FoodyFix_Orders_Export.csv"}
+    )
 
 @app.get("/api/integration-guide")
 async def integration_guide():
@@ -628,6 +829,120 @@ async def integration_guide():
         },
         "headers": {"Content-Type": "application/json", "X-FoodyFix-Key": "your-api-key"}
     })
+
+# ─── API: Rewards & Goals ───────────────────────────────────────────────────
+@app.get("/api/rewards/status")
+async def get_reward_status():
+    data = db_manager.get_user_data()
+    rewards = data.get("rewards", {
+        "current_goal": None,
+        "streak": 0,
+        "cheat_meals_available": 0,
+        "completed_goals": 0,
+        "progress": 0
+    })
+    
+    # Calculate streak based on recent meals
+    meals = data.get("meals", [])
+    today_date = date.today()
+    
+    streak = 0
+    if meals:
+        # Sort meals by date descending
+        sorted_meals = sorted(meals, key=lambda x: x.get("date", ""), reverse=True)
+        today_str = date.today().strftime("%Y-%m-%d")
+        yesterday_str = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
+        
+        # Start checking from today or yesterday
+        has_today = any(m.get("date") == today_str for m in sorted_meals)
+        has_yesterday = any(m.get("date") == yesterday_str for m in sorted_meals)
+        
+        if has_today or has_yesterday:
+            checked_date = date.today() if has_today else date.today() - timedelta(days=1)
+            while True:
+                day_str = checked_date.strftime("%Y-%m-%d")
+                day_meals = [m for m in sorted_meals if m.get("date") == day_str]
+                
+                if not day_meals:
+                    break
+                
+                # Strict streak: Day is healthy only if ALL meals are A, B, or C, AND at least one is A or B.
+                # Or simpler: no D or F meals on that day.
+                has_unhealthy = any(m.get("grade") in ["D", "F"] for m in day_meals)
+                has_very_healthy = any(m.get("grade") in ["A", "B"] for m in day_meals)
+                
+                if not has_unhealthy and has_very_healthy:
+                    streak += 1
+                    checked_date -= timedelta(days=1)
+                else:
+                    break
+    
+    rewards["streak"] = streak
+    
+    # Update progress if goal exists
+    if rewards.get("current_goal"):
+        target = rewards["current_goal"].get("target_days", 7)
+        rewards["progress"] = min(100, (streak / target) * 100)
+    else:
+        rewards["progress"] = 0
+    
+    db_manager.update_rewards(rewards)
+    
+    return JSONResponse(content={
+        "success": True,
+        "rewards": rewards,
+        "total_credits": data.get("credits", 0)
+    })
+
+@app.post("/api/rewards/goal")
+async def set_reward_goal(goal: HealthGoalRequest):
+    data = db_manager.get_user_data()
+    rewards = data.get("rewards", {})
+    
+    rewards["current_goal"] = {
+        "name": goal.goal_name,
+        "target_days": goal.target_days,
+        "description": goal.description,
+        "started_at": datetime.now().isoformat()
+    }
+    rewards["progress"] = 0
+    db_manager.update_rewards(rewards)
+    
+    return JSONResponse(content={"success": True, "goal": rewards["current_goal"]})
+
+@app.post("/api/rewards/claim-cheat-meal")
+async def claim_cheat_meal():
+    data = db_manager.get_user_data()
+    rewards = data.get("rewards", {})
+    goal = rewards.get("current_goal")
+    
+    if not goal:
+        return JSONResponse(content={"success": False, "message": "No active goal."}, status_code=400)
+        
+    if rewards.get("streak", 0) >= goal.get("target_days", 7):
+        rewards["cheat_meals_available"] = rewards.get("cheat_meals_available", 0) + 1
+        rewards["completed_goals"] = rewards.get("completed_goals", 0) + 1
+        rewards["current_goal"] = None
+        rewards["progress"] = 0
+        db_manager.update_rewards(rewards)
+        return JSONResponse(content={"success": True, "message": "Cheat Meal Unlocked! Enjoy your reward."})
+    
+    return JSONResponse(content={"success": False, "message": f"Goal not yet reached. Need {goal.get('target_days', 7)} days streak."}, status_code=400)
+
+# ─── API: Diet Plan ──────────────────────────────────────────────────────────
+@app.post("/api/diet/generate")
+async def generate_diet_plan(req: DietPlanRequest):
+    try:
+        plan = await gemini.generate_diet_plan(
+            req.preferences, 
+            req.target_calories, 
+            req.diet_type, 
+            req.allergies
+        )
+        return JSONResponse(content={"success": True, "plan": plan})
+    except Exception as e:
+        logger.error(f"Error generating diet plan: {str(e)}")
+        raise HTTPException(status_code=500, detail="Neural Engine failed to generate plan.")
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 def _calculate_credits(meal: dict) -> int:
